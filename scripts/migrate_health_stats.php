@@ -7,8 +7,32 @@
  * To change this template use File | Settings | File Templates.
  */
 
-$conn_kenya_data = mysql_connect("localhost", "root", "root");
-$conn_huduma_db = mysql_connect("localhost", "root", "root");
+set_time_limit(0);
+
+class Fields {
+    public $fp;
+    public $outp;
+    public $anc;
+    public $imci;
+    public $tb_treat;
+    public $growth;
+    public $coec;
+    public $tb_labs;
+    public $inp;
+    public $art;
+    public $beoc;
+    public $hbc;
+    public $tb_diag;
+    public $hct;
+    public $c_section;
+    public $imm;
+    public $youth;
+    public $pmtct;
+    public $radiology;
+}
+
+$conn_kenya_data = mysql_connect("localhost", "root", "root", true);
+$conn_huduma_db = mysql_connect("localhost", "root", "root", true);
 
 mysql_select_db("kenya_data", $conn_kenya_data);
 mysql_select_db("huduma", $conn_huduma_db);
@@ -35,7 +59,7 @@ function get_count_of_yes($field_name, $constituency_id, $conn_kenya_data) {
     return $my_array[0];
 }
 
-$constituency_list_result = mysql_query("SELECT constituency_id, constituency FROM constituency");
+$constituency_list_result = mysql_query("SELECT constituency_id, constituency FROM constituency", $conn_kenya_data);
 $constituencies = array();
 $constituencies_id = array();
 $constituencies_kenya_data_id = array();
@@ -69,6 +93,7 @@ $current_index = 0;
 
 foreach($constituencies_kenya_data_id as $constituency_id) {
     $statistics[$current_index]->constituency_id = $constituencies_id[$current_index];
+    $statistics[$current_index]->fields = new Fields();
     $statistics[$current_index]->fields->fp = get_count_of_yes('fp', $constituency_id, $conn_kenya_data);
     $statistics[$current_index]->fields->outp = get_count_of_yes('outp', $constituency_id, $conn_kenya_data);
     $statistics[$current_index]->fields->anc = get_count_of_yes('anc', $constituency_id, $conn_kenya_data);
@@ -88,12 +113,14 @@ foreach($constituencies_kenya_data_id as $constituency_id) {
     $statistics[$current_index]->fields->youth = get_count_of_yes('youth', $constituency_id, $conn_kenya_data);
     $statistics[$current_index]->fields->pmtct = get_count_of_yes('pmtct', $constituency_id, $conn_kenya_data);
     $statistics[$current_index]->fields->radiology = get_count_of_yes('radiology', $constituency_id, $conn_kenya_data);
+
+    $current_index ++;
 }
 
 $object_vars = get_object_vars($statistics[0]->fields);
 $fields = "[";
 
-foreach($object_vars as $var) {
+foreach($object_vars as $var=>$val) {
     $fields.='"'.$var.'",';
 }
 
@@ -102,7 +129,7 @@ $fields.="]";
 
 // Insert statistics to the database
 
-$insert_master_record = mysql_query("INSERT INTO boundary_meta_data (meta_data_title, meta_data_column) VALUES ('Health Facilities', '$fields')", $conn_huduma_db);
+$insert_master_record = mysql_query("INSERT INTO boundary_metadata (metadata_title, metadata_columns) VALUES ('Health Facilities', '$fields')", $conn_huduma_db);
 $boundary_metadata_id = mysql_insert_id($conn_huduma_db);
 
 foreach($statistics as $statistic) {
@@ -112,11 +139,13 @@ foreach($statistics as $statistic) {
 
     $current_index = 0;
 
-    foreach($object_vars as $var) {
+    foreach($object_vars as $var=>$val) {
         $new_field_list->$current_index = $field_list->$var;
+
+        $current_index ++;
     }
 
-    $insert_detail_record = mysql_query("INSERT INTO boundary_meta_data_items (boundary_metadata_id, boundary_id, data_items) VALUES ($boundary_metadata_id, $boundary_id, '".json_encode($field_list)."')", $conn_huduma_db);
+    $insert_detail_record = mysql_query("INSERT INTO boundary_metadata_items (boundary_metadata_id, boundary_id, data_items) VALUES ($boundary_metadata_id, $boundary_id, '".json_encode($new_field_list)."')", $conn_huduma_db);
 }
 
 // Close all connections
